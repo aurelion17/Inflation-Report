@@ -50,16 +50,12 @@ coicop_items= c("CP00","TOT_X_NRG_FOOD")
 hicp = get_eurostat(id = "prc_hicp_manr", time_format = "date")
 #hicp_ea_component = get_eurostat(id = "prc_hicp_ctrb", time_format = "date")
 
-#Set proxies - VERY IMPORTANT IN THE BANK ELSE WILL NOT WORK
-proxy_url <- "http://10.15.11.225:8080"
-Sys.setenv(http_proxy = proxy_url, https_proxy = proxy_url, ftp_proxy = proxy_url)
-
 euro_area = c("AT", "BE", "CY", "DE","EA","EE", "EL", "ES", "FI", "FR", "IE", "IT", "LU","LT","HR", 
        "LV", "MT", "NL", "PT", "SI", "SK","U2")
 
-## Define your IAM credentials (Note this is Darwin log in details if different from SDW)
-euaccount="IEANOCERA"
-password="TempPass24%"
+## Define your IAM credentials (Login details to connect to the ECB SDW System)
+euaccount= # insert here account details
+password=  # insert here account details 
 
 ## Define format for data i.e. accept text or csv files from API
 headers = c(`Accept` = 'text/csv')
