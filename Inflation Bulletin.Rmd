@@ -1,0 +1,667 @@
+---
+title: "Inflation Report"
+date:"r format(Sys.time(), '%d %B %Y')"
+output: 
+  html_document
+    toc: yes
+    toc_float:
+      collapsed: no
+      smooth_scrool: no
+    toc_depth: 2
+    df_print: paged
+    theme: journal
+  pdf_document:
+    toc: yes
+    toc_depth: '2'
+--
+
+The **Inflation Dashboard** shows the recent trends in inflation (HICP) and its components in the euro area.  
+Data is sourced from Eurostat and the ECB.
+
+Final estimate will be released on 17 April. April inflation estimate will be released on 30 April
+
+For any queries, please contact **Aurelio Nocera (Monetary Policy Division)**.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.align='center',echo = FALSE,warning = FALSE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+
+require("tidyr")
+require("purrr")
+require("dplyr")
+require("xlsx")
+require("zoo")
+require("ggplot2")
+require("plotly")
+require("httr")
+require("knitr")
+require("kableExtra")
+require("httr2")
+library("lubridate")
+library(glue)
+library(curl)
+library(flextable)
+library(eurostat)
+
+# tutorial https://ropengov.github.io/eurostat/articles/eurostat_tutorial.html#downloading-data
+
+coicop_items= c("CP00","TOT_X_NRG_FOOD")
+
+hicp = get_eurostat(id = "prc_hicp_manr", time_format = "date")
+#hicp_ea_component = get_eurostat(id = "prc_hicp_ctrb", time_format = "date")
+
+#Set proxies - VERY IMPORTANT IN THE BANK ELSE WILL NOT WORK
+proxy_url <- "http://10.15.11.225:8080"
+Sys.setenv(http_proxy = proxy_url, https_proxy = proxy_url, ftp_proxy = proxy_url)
+
+euro_area = c("AT", "BE", "CY", "DE","EA","EE", "EL", "ES", "FI", "FR", "IE", "IT", "LU","LT","HR", 
+       "LV", "MT", "NL", "PT", "SI", "SK","U2")
+
+## Define your IAM credentials (Note this is Darwin log in details if different from SDW)
+euaccount="IEANOCERA"
+password="TempPass24%"
+
+## Define format for data i.e. accept text or csv files from API
+headers = c(`Accept` = 'text/csv')
+
+# Combine the protocol wsEntryPoint and resource
+source ="https://esb-ws-scde.eu.escb.eu/ws/SDW21/REST/service/data/ICP/"
+
+##Headline SDW 
+
+series_key<- "M..N.000000.4.ANR"
+series_key= paste0(series_key) 
+df <- httr::GET(glue(source, series_key), config(ssl_verifypeer = FALSE), authenticate(euaccount, password), 
+                verbose(), add_headers(.headers = headers))           # Note that the target file is CSV format.
+df= read.csv(textConnection(content(df, 'text')))
+
+hicp_sdw<- df[,c("TIME_PERIOD","OBS_VALUE","REF_AREA")]
+
+hicp_sdw<- hicp_sdw%>%
+  filter(REF_AREA %in% euro_area)
+
+##Core SDW
+
+series_key<- "M..N.XEF000.4.ANR"
+series_key= paste0(series_key) 
+df <- httr::GET(glue(source, series_key), config(ssl_verifypeer = FALSE), authenticate(euaccount, password), 
+                verbose(), add_headers(.headers = headers))           # Note that the target file is CSV format.
+df= read.csv(textConnection(content(df, 'text')))
+
+core_sdw<- df[,c("TIME_PERIOD","OBS_VALUE","REF_AREA")]
+
+core_sdw<- core_sdw%>%
+  filter(REF_AREA %in% euro_area)
+
+###Headline
+
+series_key <- "M.U2.Y.000000.3.INX"
+series_key = paste0(series_key) 
+df <- httr::GET(glue(source, series_key), config(ssl_verifypeer = FALSE), authenticate(euaccount, password), 
+                verbose(), add_headers(.headers = headers))           # Note that the target file is CSV format.
+df= read.csv(textConnection(content(df, 'text')))
+
+hicpm_sadj<- df[,c("TIME_PERIOD","OBS_VALUE")]
+
+###Headline excl energy
+
+series_key <- "M.U2.Y.XE0000.3.INX"
+series_key = paste0(series_key) 
+df <- httr::GET(glue(source, series_key), config(ssl_verifypeer = FALSE), authenticate(euaccount, password), 
+                verbose(), add_headers(.headers = headers))           # Note that the target file is CSV format.
+df= read.csv(textConnection(content(df, 'text')))
+
+hicp5_sadj<- df[,c("TIME_PERIOD","OBS_VALUE")]
+
+###Core
+
+series_key <- "M.U2.Y.XEF000.3.INX"
+series_key = paste0(series_key) 
+df <- httr::GET(glue(source, series_key), config(ssl_verifypeer = FALSE), authenticate(euaccount, password), 
+                verbose(), add_headers(.headers = headers))           # Note that the target file is CSV format.
+df= read.csv(textConnection(content(df, 'text')))
+
+core_sadj<- df[,c("TIME_PERIOD","OBS_VALUE")]
+
+### Services
+
+series_key <- "M.U2.Y.SERV00.3.INX"
+series_key = paste0(series_key) 
+df <- httr::GET(glue(source, series_key), config(ssl_verifypeer = FALSE), authenticate(euaccount, password), 
+                verbose(), add_headers(.headers = headers))           # Note that the target file is CSV format.
+df= read.csv(textConnection(content(df, 'text')))
+
+services_sadj<- df[,c("TIME_PERIOD","OBS_VALUE")]
+
+###Goods
+
+series_key <- "M.U2.Y.IGXE00.3.INX"
+series_key = paste0(series_key) 
+df <- httr::GET(glue(source, series_key), config(ssl_verifypeer = FALSE), authenticate(euaccount, password), 
+                verbose(), add_headers(.headers = headers))           # Note that the target file is CSV format.
+df= read.csv(textConnection(content(df, 'text')))
+
+goods_sadj<- df[,c("TIME_PERIOD","OBS_VALUE")]
+
+### Foods
+
+series_key <- "M.U2.Y.FOOD00.3.INX"
+series_key = paste0(series_key) 
+df <- httr::GET(glue(source, series_key), config(ssl_verifypeer = FALSE), authenticate(euaccount, password), 
+                verbose(), add_headers(.headers = headers))           # Note that the target file is CSV format.
+df= read.csv(textConnection(content(df, 'text')))
+
+food_sadj<- df[,c("TIME_PERIOD","OBS_VALUE")]
+
+###NEIG
+
+series_key <- "M.U2.Y.IGXE00.3.INX"
+series_key = paste0(series_key) 
+df <- httr::GET(glue(source, series_key), config(ssl_verifypeer = FALSE), authenticate(euaccount, password), 
+                verbose(), add_headers(.headers = headers))           # Note that the target file is CSV format.
+df= read.csv(textConnection(content(df, 'text')))
+
+neig_sadj<- df[,c("TIME_PERIOD","OBS_VALUE")]
+
+neig<- neig_sadj%>%
+  mutate(momentum3m=4*((neig_sadj$OBS_VALUE-lag(neig_sadj$OBS_VALUE,3))/lag(neig_sadj$OBS_VALUE,3)*100))%>%
+  mutate(yoy_growth=100*(neig_sadj$OBS_VALUE-lag(neig_sadj$OBS_VALUE,12))/lag(neig_sadj$OBS_VALUE,12))%>%
+  mutate(Date=TIME_PERIOD)%>%
+  select(Date,momentum3m,yoy_growth)
+
+neig<-pivot_longer(neig,cols=2:3,names_to="Variable",values_to="Values")
+neig<-neig%>%
+  filter(Date>="2020-01")
+
+write.csv(neig,"neig.csv")
+
+### Transformation
+
+core4<- core_sadj%>%
+  mutate(momentum3m=4*((core_sadj$OBS_VALUE-lag(core_sadj$OBS_VALUE,3))/lag(core_sadj$OBS_VALUE,3)*100))%>%
+  mutate(yoy_growth=100*(core_sadj$OBS_VALUE-lag(core_sadj$OBS_VALUE,12))/lag(core_sadj$OBS_VALUE,12))%>%
+  mutate(Date=TIME_PERIOD)%>%
+  select(Date,momentum3m,yoy_growth)
+
+core4<-pivot_longer(core4,cols=2:3,names_to="Variable",values_to="Values")
+core4<-core4%>%
+  filter(Date>="2020-01")
+
+write.csv(core4,"core_m_yoy.csv")
+
+hicpm<- hicpm_sadj%>%
+  mutate(momentum3m=4*((hicpm_sadj$OBS_VALUE-lag(hicpm_sadj$OBS_VALUE,3))/lag(hicpm_sadj$OBS_VALUE,3)*100))%>%
+  mutate(yoy_growth=100*(hicpm_sadj$OBS_VALUE-lag(hicpm_sadj$OBS_VALUE,12))/lag(hicpm_sadj$OBS_VALUE,12))%>%
+  mutate(Date=TIME_PERIOD)%>%
+  select(Date,momentum3m,yoy_growth)
+
+hicpm<-pivot_longer(hicpm,cols=2:3,names_to="Variable",values_to="Values")
+hicpm<-hicpm%>%
+  filter(Date>="2020-01")
+
+write.csv(hicpm,"hicpm.csv")
+
+hicp5<- hicp5_sadj%>%
+  mutate(momentum3m=4*((hicp5_sadj$OBS_VALUE-lag(hicp5_sadj$OBS_VALUE,3))/lag(hicp5_sadj$OBS_VALUE,3)*100))%>%
+  mutate(yoy_growth=100*(hicp5_sadj$OBS_VALUE-lag(hicp5_sadj$OBS_VALUE,12))/lag(hicp5_sadj$OBS_VALUE,12))%>%
+  mutate(Date=TIME_PERIOD)%>%
+  select(Date,momentum3m,yoy_growth)
+
+hicp5<-pivot_longer(hicp5,cols=2:3,names_to="Variable",values_to="Values")
+hicp5<-hicp5%>%
+  filter(Date>="2020-01")
+
+write.csv(hicp5,"hicp5.csv")
+
+services<- services_sadj%>%
+  mutate(momentum3m=4*((services_sadj$OBS_VALUE-lag(services_sadj$OBS_VALUE,3))/lag(services_sadj$OBS_VALUE,3)*100))%>%
+  mutate(yoy_growth=100*(services_sadj$OBS_VALUE-lag(services_sadj$OBS_VALUE,12))/lag(services_sadj$OBS_VALUE,12))%>%
+  mutate(Date=TIME_PERIOD)%>%
+  select(Date,momentum3m,yoy_growth)
+
+services<-pivot_longer(services,cols=2:3,names_to="Variable",values_to="Values")
+services<-services%>%
+  filter(Date>="2020-01")
+
+write.csv(services,"services.csv")
+
+goods<- goods_sadj%>%
+  mutate(momentum3m=4*((goods_sadj$OBS_VALUE-lag(goods_sadj$OBS_VALUE,3))/lag(goods_sadj$OBS_VALUE,3)*100))%>%
+  mutate(yoy_growth=100*(goods_sadj$OBS_VALUE-lag(goods_sadj$OBS_VALUE,12))/lag(goods_sadj$OBS_VALUE,12))%>%
+  mutate(Date=TIME_PERIOD)%>%
+  select(Date,momentum3m,yoy_growth)
+
+goods<-pivot_longer(goods,cols=2:3,names_to="Variable",values_to="Values")
+goods<-goods%>%
+  filter(Date>="2020-01")
+
+write.csv(goods,"goods.csv")
+
+food<- food_sadj%>%
+  mutate(momentum3m=4*((food_sadj$OBS_VALUE-lag(food_sadj$OBS_VALUE,3))/lag(food_sadj$OBS_VALUE,3)*100))%>%
+  mutate(yoy_growth=100*(food_sadj$OBS_VALUE-lag(food_sadj$OBS_VALUE,12))/lag(food_sadj$OBS_VALUE,12))%>%
+  mutate(Date=TIME_PERIOD)%>%
+  select(Date,momentum3m,yoy_growth)
+
+food<-pivot_longer(food,cols=2:3,names_to="Variable",values_to="Values")
+food<-food%>%
+  filter(Date>="2020-01")
+
+write.csv(food,"food.csv")
+
+```
+
+# Flash estimate release
+
+```{r}
+
+hicp$TIME_PERIOD<- as.Date(paste(hicp$TIME_PERIOD,"01",sep="-"),format="%Y-%m-%d")
+
+headline_euro_area = subset(hicp,geo %in% euro_area & TIME_PERIOD >="2020-01-01")%>%
+ mutate(date=TIME_PERIOD)%>%
+ select(coicop,geo,date,values)
+
+headline_euro_area =subset(headline_euro_area,coicop =="CP00")
+
+march<-max(headline_euro_area$date)
+february<-max(headline_euro_area$date[headline_euro_area$date<march])
+
+march_data<-headline_euro_area%>% filter(date==march)
+february_data<- headline_euro_area%>% filter(date==february)
+
+country_table<-data.frame(Country=unique(headline_euro_area$geo))
+
+headline_result_table<- country_table%>%left_join(march_data%>%select(geo,March=values),by=c("Country"="geo"))%>%
+ left_join(february_data %>% select(geo,February=values),by=c("Country"="geo"))
+
+```
+
+
+```{r}
+
+core_euro_area = subset(hicp,geo %in% euro_area & TIME_PERIOD >="2020-01-01")%>%
+ mutate(date=TIME_PERIOD)%>%
+ select(coicop,geo,date,values)
+
+core_euro_area =subset(core_euro_area,coicop =="TOT_X_NRG_FOOD")
+
+march<-max(core_euro_area$date)
+february<-max(core_euro_area$date[core_euro_area$date<march])
+
+march_data<-core_euro_area%>% filter(date==march)
+february_data<- core_euro_area%>% filter(date==february)
+
+country_table<-data.frame(Country=unique(core_euro_area$geo))
+
+core_result_table<- country_table%>%left_join(march_data%>%select(geo,March=values),by=c("Country"="geo"))%>%
+ left_join(february_data %>% select(geo,February=values),by=c("Country"="geo"))
+
+```
+
+## Headline and Core 
+
+```{r}
+
+headline_core_table_2<- headline_result_table%>%left_join(core_result_table,by="Country")
+
+colnames(headline_core_table_2)<- c("Country","Headline/Flash Mar","Headline/Feb","Core/Flash Mar","Core/Feb")
+
+headline_core_table_2<- flextable(headline_core_table_2)
+
+headline_core_table_2<-bold(headline_core_table_2,i=c(5,12),bold=TRUE,part="body")
+
+headline_core_table_2
+
+```
+
+## Headline flash estimate
+
+The March headline flash reading for euro area is 2.4%; March flash reading is above 2% in the majority of the euro area countries. 
+
+```{r}
+
+headline_euro_area = subset(hicp,geo %in% euro_area & TIME_PERIOD >=max(TIME_PERIOD))%>%
+  mutate(date=TIME_PERIOD)%>%
+  select(coicop,geo,date,values)
+
+headline_euro_area =subset(headline_euro_area,coicop =="CP00")
+
+headline_euro_area<- headline_euro_area%>%
+  mutate(hicp_item= case_when(
+    coicop == "CP00" ~ "Headline"))%>%
+  select(hicp_item,date,geo,values)
+
+headline_euro_area$geo<- factor(headline_euro_area$geo,levels=headline_euro_area$geo[order(headline_euro_area$values)])
+
+chart3<-ggplot(headline_euro_area,aes(x=values,y=geo))+
+  geom_bar(stat="identity",position="identity",fill="skyblue")+
+  theme_minimal()+
+  theme(axis.title.x=element_blank(),
+        axis.title.y=element_blank(),
+        plot.title=element_blank(),
+        panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank())
+
+ggplotly(chart3)
+
+```
+
+(**Source: Eurostat** [link](https://ec.europa.eu/eurostat/databrowser/product/view/prc_hicp_manr))
+
+## Core flash estimate
+
+The March core flash reading estimate is 2.9% for euro area; flash estimates for core are above 2% in all countries in the euro area.
+
+```{r}
+
+core_euro_area = subset(hicp,geo %in% euro_area & TIME_PERIOD >=max(TIME_PERIOD))%>%
+  mutate(date=TIME_PERIOD)%>%
+  select(coicop,geo,date,values)
+
+core_euro_area =subset(core_euro_area,coicop =="TOT_X_NRG_FOOD")
+
+core_euro_area<- core_euro_area%>%
+  mutate(hicp_item= case_when(
+    coicop == "TOT_X_NRG_FOOD" ~ "Core"))%>%
+  select(hicp_item,date,geo,values)
+
+core_euro_area$geo<- factor(core_euro_area$geo,levels=core_euro_area$geo[order(core_euro_area$values)])
+
+chart4<-ggplot(core_euro_area,aes(x=values,y=geo))+
+  geom_bar(stat="identity",position="identity",fill="skyblue")+
+  theme_minimal()+
+  theme(axis.title.x=element_blank(),
+        axis.title.y=element_blank(),
+        plot.title=element_blank(),
+        panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank())
+
+ggplotly(chart4)
+
+```
+(**Source: Eurostat** [link](https://ec.europa.eu/eurostat/databrowser/product/view/prc_hicp_manr))
+
+## Euro Area
+
+The March flash readings for inflation Headline and Core are 2.4% and 2.9%, respectively.
+
+```{r}
+
+### All items HICP, Food, 
+
+hicp_core_ea<- hicp_sdw%>%
+  left_join(core_sdw,by=c("TIME_PERIOD","REF_AREA"))%>%
+  filter(REF_AREA =="U2")%>%
+  filter(TIME_PERIOD>="2020-01")%>%
+  select(TIME_PERIOD,OBS_VALUE.x,OBS_VALUE.y)
+
+colnames(hicp_core_ea)<- c("Date","Headline","Core")
+
+hicp_core_ea<-pivot_longer(hicp_core_ea,cols=2:3,names_to="Variable",values_to="Values")
+
+hicp_core_ea$Date<- as.Date(paste(hicp_core_ea$Date,"01",sep="-"),format="%Y-%m-%d")
+
+#hicp_ea = subset(hicp,geo=="EA" & time >="2020-01-01")%>%
+#  mutate(date=time)%>%
+#  select(coicop,geo,date,values)
+
+#headline_core_ea =subset(hicp_ea,coicop %in% coicop_items)
+
+#headline_core_ea<- headline_core_ea%>%
+#  mutate(hicp_item= case_when(
+#    coicop == "CP00" ~ "Headline",
+#    coicop == "TOT_X_NRG_FOOD"~"Core"))%>%
+#  select(hicp_item,date,geo,values)
+
+chart1<-ggplot(hicp_core_ea,aes(x=Date,y=Values,color=Variable))+
+  geom_line(size=1)+
+  scale_color_manual(values=c("Headline"="#0083A0","Core"="#5EC5C2"))+
+  theme_minimal()+
+  theme(axis.title.x=element_blank(),
+        plot.title=element_blank(),
+        panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank())+
+  labs(y="YoY growth rate, %",color="")+
+  theme(axis.text.x=element_text(size=12,angle=45,hjust=1),
+        axis.text.y=element_text(size=12),
+        legend.title=element_blank())+
+  scale_x_date(date_breaks="3 months",date_labels="%b %Y")
+
+ggplotly(chart1)
+
+```
+
+(**Source: Eurostat** [link](https://ec.europa.eu/eurostat/databrowser/product/view/prc_hicp_manr))
+
+## Ireland
+
+The March flash reading for the inflation Headline rate in Ireland is 1.7%. Core flash estimate for March is not yet available.
+
+```{r}
+
+### All items HICP, Food, 
+
+hicp_core_ie<- hicp_sdw%>%
+  left_join(core_sdw,by=c("TIME_PERIOD","REF_AREA"))%>%
+  filter(REF_AREA =="IE")%>%
+  filter(TIME_PERIOD>="2020-01")%>%
+  select(TIME_PERIOD,OBS_VALUE.x,OBS_VALUE.y)
+
+colnames(hicp_core_ie)<- c("Date","Headline","Core")
+
+hicp_core_ie<-pivot_longer(hicp_core_ie,cols=2:3,names_to="Variable",values_to="Values")
+
+hicp_core_ie$Date<- as.Date(paste(hicp_core_ie$Date,"01",sep="-"),format="%Y-%m-%d")
+
+#hicp_ea = subset(hicp,geo=="EA" & time >="2020-01-01")%>%
+#  mutate(date=time)%>%
+#  select(coicop,geo,date,values)
+
+#headline_core_ea =subset(hicp_ea,coicop %in% coicop_items)
+
+#headline_core_ea<- headline_core_ea%>%
+#  mutate(hicp_item= case_when(
+#    coicop == "CP00" ~ "Headline",
+#    coicop == "TOT_X_NRG_FOOD"~"Core"))%>%
+#  select(hicp_item,date,geo,values)
+
+chart2<-ggplot(hicp_core_ie,aes(x=Date,y=Values,color=Variable))+
+  geom_line(size=1)+
+  scale_color_manual(values=c("Headline"="#0083A0","Core"="#5EC5C2"))+
+  theme_minimal()+
+  theme(axis.title.x=element_blank(),
+        plot.title=element_blank(),
+        panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank())+
+  labs(y="YoY growth rate, %",color="")+
+  theme(axis.text.x=element_text(size=12,angle=45,hjust=1),
+        axis.text.y=element_text(size=12),
+        legend.title=element_blank())+
+  scale_x_date(date_breaks="3 months",date_labels="%b %Y")
+
+ggplotly(chart2)
+
+```
+
+(**Source: Eurostat** [link](https://ec.europa.eu/eurostat/databrowser/product/view/prc_hicp_manr))
+
+# HICP components 
+
+## Headline
+
+The March readings for the momentum and year on year growth rate of headline inflation are 3.91% and 2.40%, respectively.
+
+```{r}
+
+hicpm$Date<- as.Date(paste(hicpm$Date,"01",sep="-"),format="%Y-%m-%d")
+
+chart20<-ggplot(hicpm,aes(x=Date,y=Values,color=Variable))+
+  geom_line(size=1)+
+  scale_color_manual(values=c("momentum3m"="#0083A0","yoy_growth"="#5EC5C2"))+
+  theme_minimal()+
+  theme(axis.title.x=element_blank(),
+        plot.title=element_blank(),
+        panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank())+
+  labs(y="Percentage, %",color="")+
+  theme(axis.text.x=element_text(size=12,angle=45,hjust=1),
+        axis.text.y=element_text(size=12),
+        legend.title=element_blank())+
+  scale_x_date(date_breaks="3 months",date_labels="%b %Y")
+
+ggplotly(chart20)
+
+```
+Momentum is defined as the annualised 3 months on 3 months rates, seasonally adjusted data.
+
+(**Source: SDW** [link](https://sdw.escb.eu/browse.do?node=1496)) 
+
+## HICP excluding energy
+
+The March readings for the momentum and year on year growth rate for HICP excluding energy are 3.30% and 2.85%, respectively.
+
+```{r}
+
+hicp5$Date<- as.Date(paste(hicp5$Date,"01",sep="-"),format="%Y-%m-%d")
+
+chart6<-ggplot(hicp5,aes(x=Date,y=Values,color=Variable))+
+  geom_line(size=1)+
+  scale_color_manual(values=c("momentum3m"="#0083A0","yoy_growth"="#5EC5C2"))+
+  theme_minimal()+
+  theme(axis.title.x=element_blank(),
+        plot.title=element_blank(),
+        panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank())+
+  labs(y="Percentage, %",color="")+
+  theme(axis.text.x=element_text(size=12,angle=45,hjust=1),
+        axis.text.y=element_text(size=12),
+        legend.title=element_blank())+
+  scale_x_date(date_breaks="3 months",date_labels="%b %Y")
+
+ggplotly(chart6)
+
+```
+Momentum is defined as the annualised 3 months on 3 months rates, seasonally adjusted data.
+
+(**Source: SDW** [link](https://sdw.escb.eu/browse.do?node=1496)) 
+
+## Core
+
+The March readings for the momentum and year on year growth rate of core inflation are 3.72% and 2.88%, respectively.
+
+```{r}
+
+core4$Date<- as.Date(paste(core4$Date,"01",sep="-"),format="%Y-%m-%d")
+
+chart5<-ggplot(core4,aes(x=Date,y=Values,color=Variable))+
+  geom_line(size=1)+
+  scale_color_manual(values=c("momentum3m"="#0083A0","yoy_growth"="#5EC5C2"))+
+  theme_minimal()+
+  theme(axis.title.x=element_blank(),
+        plot.title=element_blank(),
+        panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank())+
+  labs(y="Percentage, %",color="")+
+  theme(axis.text.x=element_text(size=12,angle=45,hjust=1),
+        axis.text.y=element_text(size=12),
+        legend.title=element_blank())+
+  scale_x_date(date_breaks="3 months",date_labels="%b %Y")
+
+ggplotly(chart5)
+
+```
+Momentum is defined as the annualised 3 months on 3 months rates, seasonally adjusted data.
+
+(**Source: SDW** [link](https://sdw.escb.eu/browse.do?node=1496)) 
+
+## Services
+
+The March readings for the momentum and year on year growth rate of services inflation are 5.29% and 3.89%, respectively.
+
+```{r}
+
+services$Date<- as.Date(paste(services$Date,"01",sep="-"),format="%Y-%m-%d")
+
+chart7<-ggplot(services,aes(x=Date,y=Values,color=Variable))+
+  geom_line(size=1)+
+  scale_color_manual(values=c("momentum3m"="#0083A0","yoy_growth"="#5EC5C2"))+
+  theme_minimal()+
+  theme(axis.title.x=element_blank(),
+        plot.title=element_blank(),
+        panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank())+
+  labs(y="Percentage, %",color="")+
+  theme(axis.text.x=element_text(size=12,angle=45,hjust=1),
+        axis.text.y=element_text(size=12),
+        legend.title=element_blank())+
+  scale_x_date(date_breaks="3 months",date_labels="%b %Y")
+
+ggplotly(chart7)
+```
+
+Momentum is defined as the annualised 3 months on 3 months rates, seasonally adjusted data.
+
+(**Source: SDW** [link](https://sdw.escb.eu/browse.do?node=1496)) 
+
+## Goods
+
+The March readings for the momentum and year on year growth rate of goods inflation are 0.98% and 1.17%, respectively.
+
+```{r}
+
+goods$Date<- as.Date(paste(goods$Date,"01",sep="-"),format="%Y-%m-%d")
+
+chart8<-ggplot(goods,aes(x=Date,y=Values,color=Variable))+
+  geom_line(size=1)+
+  scale_color_manual(values=c("momentum3m"="#0083A0","yoy_growth"="#5EC5C2"))+
+  theme_minimal()+
+  theme(axis.title.x=element_blank(),
+        plot.title=element_blank(),
+        panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank())+
+  labs(y="Percentage, %",color="")+
+  theme(axis.text.x=element_text(size=12,angle=45,hjust=1),
+        axis.text.y=element_text(size=12),
+        legend.title=element_blank())+
+  scale_x_date(date_breaks="3 months",date_labels="%b %Y")
+
+ggplotly(chart8)
+
+```
+
+Momentum is defined as the annualised 3 months on 3 months rates, seasonally adjusted data.
+
+(**Source: SDW** [link](https://sdw.escb.eu/browse.do?node=1496))
+
+## Food
+
+The March readings for the momentum and year on year growth rate for food inflation are 1.78% and 2.71%, respectively.
+
+```{r}
+
+food$Date<- as.Date(paste(food$Date,"01",sep="-"),format="%Y-%m-%d")
+
+chart9<-ggplot(food,aes(x=Date,y=Values,color=Variable))+
+  geom_line(size=1)+
+  scale_color_manual(values=c("momentum3m"="#0083A0","yoy_growth"="#5EC5C2"))+
+  theme_minimal()+
+  theme(axis.title.x=element_blank(),
+        plot.title=element_blank(),
+        panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank())+
+  labs(y="Percentage, %",color="")+
+  theme(axis.text.x=element_text(size=12,angle=45,hjust=1),
+        axis.text.y=element_text(size=12),
+        legend.title=element_blank())+
+  scale_x_date(date_breaks="3 months",date_labels="%b %Y")
+
+ggplotly(chart9)
+
+```
+
+Momentum is defined as the annualised 3 months on 3 months rates, seasonally adjusted data.
+
+(**Source: SDW** [link](https://sdw.escb.eu/browse.do?node=1496)) 
+
+
+
