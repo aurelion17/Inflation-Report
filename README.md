@@ -10,5 +10,6 @@ This R Markdown script:
 3. produces interactive charts of different inflations measures, across different inflation components. 
 
 *Momentum is defined as the annualised 3 months on 3 months rates, seasonally adjusted data.
+
 Momentum measures have been used by ECB during the latest months to monitor the development of inflation rates, taking into account a wider time frame than the single latest data point. 
 
