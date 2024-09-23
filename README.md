@@ -1,6 +1,7 @@
 # Inflation-Report
 
-Important information: Github does not allow to display the output of an html file larger than 5mb. Therefore, please notice that to visualize the html file you will need to download a copy of the file on your local machine.
+Important information: Github does not allow to display the output of an html file larger than 5mb. 
+_Therefore, please notice that to visualize the html file you will need to download a copy of the file on your local machine._
 
 This R Markdown script: 
 1. connects to the Eurostat & ECB/SDW APIs to download inflation flash estimates data;
