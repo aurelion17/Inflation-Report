@@ -17,8 +17,8 @@ output:
 
 The **Inflation Report** shows the recent trends in inflation (HICP) and its components in the euro area.  Data is sourced from Eurostat and ECB.
 
-September final estimates will be released on October 17th. 
-October flash estimates will be released on November 3rd. 
+December final estimates will be released on January 17th. 
+January flash estimates will be released on February 3rd. 
 
 For any queries, please do not hesitate to contact me. 
 Author: **Aurelio Nocera**.
@@ -220,16 +220,16 @@ headline_euro_area = subset(hicp_eurostat,geo %in% euro_area & TIME_PERIOD >="20
 
 headline_euro_area =subset(headline_euro_area,coicop =="CP00")
 
-sept<-max(headline_euro_area$date)
-aug<-max(headline_euro_area$date[headline_euro_area$date<sept])
+dec<-max(headline_euro_area$date)
+nov<-max(headline_euro_area$date[headline_euro_area$date<dec])
 
-sept_data<-headline_euro_area%>% filter(date==sept)
-aug_data<- headline_euro_area%>% filter(date==aug)
+dec_data<-headline_euro_area%>% filter(date==dec)
+nov_data<- headline_euro_area%>% filter(date==nov)
 
 country_table<-data.frame(Country=unique(headline_euro_area$geo))
 
-headline_result_table<- country_table%>%left_join(sept_data%>%select(geo,September=values),by=c("Country"="geo"))%>%
- left_join(aug_data %>% select(geo,August=values),by=c("Country"="geo"))
+headline_result_table<- country_table%>%left_join(dec_data%>%select(geo,December=values),by=c("Country"="geo"))%>%
+ left_join(nov_data %>% select(geo,November=values),by=c("Country"="geo"))
 
 ```
 
@@ -242,16 +242,16 @@ core_euro_area = subset(hicp_eurostat,geo %in% euro_area & TIME_PERIOD >="2020-0
 
 core_euro_area =subset(core_euro_area,coicop =="TOT_X_NRG_FOOD")
 
-sept<-max(core_euro_area$date)
-aug<-max(core_euro_area$date[core_euro_area$date<sept])
+dec<-max(core_euro_area$date)
+nov<-max(core_euro_area$date[core_euro_area$date<dec])
 
-sept_data<-core_euro_area%>% filter(date==sept)
-aug_data<- core_euro_area%>% filter(date==aug)
+dec_data<-core_euro_area%>% filter(date==dec)
+nov_data<- core_euro_area%>% filter(date==nov)
 
 country_table<-data.frame(Country=unique(core_euro_area$geo))
 
-core_result_table<- country_table%>%left_join(sept_data%>%select(geo,Sept=values),by=c("Country"="geo"))%>%
- left_join(aug_data %>% select(geo,Aug=values),by=c("Country"="geo"))
+core_result_table<- country_table%>%left_join(dec_data%>%select(geo,Dec=values),by=c("Country"="geo"))%>%
+ left_join(nov_data %>% select(geo,Nov=values),by=c("Country"="geo"))
 
 ```
 
@@ -261,7 +261,7 @@ core_result_table<- country_table%>%left_join(sept_data%>%select(geo,Sept=values
 
 headline_core_table_2<- headline_result_table%>%left_join(core_result_table,by="Country")
 
-colnames(headline_core_table_2)<- c("Country","Headline/Flash Sept","Headline/Aug","Core/Flash Sept","Core/Aug")
+colnames(headline_core_table_2)<- c("Country","Headline/Flash Dec","Headline/Dec","Core/Flash Nov","Core/Nov")
 
 headline_core_table_2<- flextable(headline_core_table_2)
 
@@ -273,7 +273,7 @@ headline_core_table_2
 
 ## Headline flash estimate
 
-The September headline flash reading for euro area is 1.8%; September flash readings is finally below 2% for the majority of the euro area countries. 
+The December headline flash reading for euro area is 2.4%; December flash readings is strictly below 2% for only 6 countries in the Euro Area. 
 
 ```{r}
 
@@ -307,7 +307,7 @@ ggplotly(chart1)
 
 ## Core flash estimate
 
-The September core flash reading estimate is 2.7% for euro area; flash estimates for core are above 2% in the majority of all countries in the euro area.
+The December core flash reading estimate is again 2.7% for euro area, which is the same level recorded since September. Flash estimates for core are above 2% in the great majority of all countries in the euro area.
 
 ```{r}
 
@@ -340,7 +340,7 @@ ggplotly(chart2)
 
 ## Euro Area
 
-The September readings for inflation Headline and Core are 1.8% and 2.7%, respectively.
+The December readings for inflation Headline and Core are 2.4% and 2.7%, respectively.
 
 ```{r}
 
@@ -380,7 +380,8 @@ ggplotly(chart3)
 
 # Headline inflation/ Components' breakdown
 
-According to August data, Energy contribution turned negative again. Services and Food contributions increased with respect to July data. 
+According to November data, Energy contribution remain negative (-0.19), but it represented a third of October value (-0.45). 
+Services, Food and NEIG contributions remained in line with October values. 
 
 ```{r}
 
@@ -421,7 +422,7 @@ ggplotly(chart4)
 
 ## Headline
 
-The September readings for the momentum and year on year growth rate of headline inflation are 1.62% and 1.75%, respectively.
+The December readings for the momentum and year on year growth rate of headline inflation are 2.51% and 2.46%, respectively.
 
 ```{r}
 
@@ -450,7 +451,7 @@ Momentum is defined as the annualised 3 months on 3 months rates, seasonally adj
 
 ## Core
 
-The September readings for the momentum and year on year growth rate of core inflation are 2.30% and 2.67%, respectively.
+The December readings for the momentum and year on year growth rate of core inflation are 1.89% and 2.73%, respectively.
 
 ```{r}
 
@@ -479,7 +480,7 @@ Momentum is defined as the annualised 3 months on 3 months rates, seasonally adj
 
 ## Services
 
-The September readings for the momentum and year on year growth rate of services inflation are 3.34% and 3.98%, respectively.
+The December readings for the momentum and year on year growth rate of services inflation are 2.77% and 4.01%, respectively.
 
 ```{r}
 
@@ -508,7 +509,7 @@ Momentum is defined as the annualised 3 months on 3 months rates, seasonally adj
 
 ## Goods
 
-The September readings for the momentum and year on year growth rate of goods inflation are 0.79% and 0.43%, respectively.
+The December readings for the momentum and year on year growth rate of goods inflation are 0.30% and 0.51%, respectively.
 
 ```{r}
 
@@ -538,7 +539,7 @@ Momentum is defined as the annualised 3 months on 3 months rates, seasonally adj
 
 ## Food
 
-The September readings for the momentum and year on year growth rate for food inflation are 3.72% and 2.41%, respectively.
+The December readings for the momentum and year on year growth rate for food inflation are 3.15% and 2.67%, respectively.
 
 ```{r}
 
